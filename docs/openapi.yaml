@@ -1,0 +1,416 @@
+openapi: 3.1.0
+info:
+  title: Energy Forecast API
+  version: 1.0.0
+  description: |
+    Wind generation forecast and accuracy API for the Wind Analytics dashboard.
+
+    The business endpoints use ISO-8601 instants for their query parameters.
+    `deliveryFrom` is inclusive and `deliveryTo` is exclusive.
+servers:
+  - url: https://energy-forecast-api-c6rc.onrender.com
+    description: Production Render service
+  - url: http://localhost:8080
+    description: Local Spring Boot service
+security: []
+tags:
+  - name: Forecasts
+    description: Selected wind generation forecasts.
+  - name: Accuracy
+    description: Forecast-to-actual comparisons and error metrics.
+  - name: Operations
+    description: Spring Boot Actuator endpoints used by deployment and monitoring tools.
+paths:
+  /api/energy/forecast/selected:
+    get:
+      tags:
+        - Forecasts
+      operationId: getSelectedForecasts
+      summary: Get selected wind forecasts
+      description: |
+        Returns the latest forecast publication per delivery hour, excluding
+        publications after `decisionTime`, then filters to the delivery window.
+      parameters:
+        - $ref: '#/components/parameters/PublishFrom'
+        - $ref: '#/components/parameters/DecisionTime'
+        - $ref: '#/components/parameters/DeliveryFrom'
+        - $ref: '#/components/parameters/DeliveryTo'
+      responses:
+        '200':
+          description: Selected forecasts ordered by delivery time.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WindForecast'
+              examples:
+                normalDay:
+                  summary: Two selected hourly forecasts
+                  value:
+                    - dataset: WINDFOR
+                      publishTime: '2026-10-19T08:30:00Z'
+                      startTime: '2026-10-19T23:00:00Z'
+                      generation: 12520.0
+                    - dataset: WINDFOR
+                      publishTime: '2026-10-19T08:30:00Z'
+                      startTime: '2026-10-20T00:00:00Z'
+                      generation: 12810.0
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/energy/accuracy:
+    get:
+      tags:
+        - Accuracy
+      operationId: getForecastAccuracy
+      summary: Get forecast accuracy
+      description: |
+        Matches selected hourly forecasts with hourly actuals built from complete
+        pairs of half-hour WIND generation observations. Only matched hours are
+        included in `comparisons`.
+      parameters:
+        - $ref: '#/components/parameters/PublishFrom'
+        - $ref: '#/components/parameters/DecisionTime'
+        - $ref: '#/components/parameters/DeliveryFrom'
+        - $ref: '#/components/parameters/DeliveryTo'
+      responses:
+        '200':
+          description: Accuracy metrics and matched hourly comparisons.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForecastAccuracyReport'
+              examples:
+                historicalDay:
+                  summary: A matched forecast and actual hour
+                  value:
+                    matchedPeriods: 1
+                    mae: 2520.0
+                    rmse: 2520.0
+                    meanBiasError: -2520.0
+                    comparisons:
+                      - deliveryTime: '2026-10-19T23:00:00Z'
+                        forecastGeneration: 12520.0
+                        actualGeneration: 10000.0
+                        error: -2520.0
+                        absoluteError: 2520.0
+                    expectedPeriods: 24
+                    coveragePercent: 4.166666666666667
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /actuator:
+    get:
+      tags:
+        - Operations
+      operationId: getActuatorIndex
+      summary: Get Actuator endpoint index
+      description: Returns links to the Actuator endpoints exposed by the application.
+      responses:
+        '200':
+          description: Actuator discovery links.
+          content:
+            application/vnd.spring-boot.actuator.v3+json:
+              schema:
+                $ref: '#/components/schemas/ActuatorIndex'
+  /actuator/health:
+    get:
+      tags:
+        - Operations
+      operationId: getHealth
+      summary: Get aggregated application health
+      description: |
+        Render uses this endpoint as its deployment health check. It reports
+        application health only and does not call Elexon.
+      responses:
+        '200':
+          description: Application health is UP.
+          content:
+            application/vnd.spring-boot.actuator.v3+json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              examples:
+                up:
+                  value:
+                    groups:
+                      - liveness
+                      - readiness
+                    status: UP
+        '503':
+          description: Application health is DOWN.
+          content:
+            application/vnd.spring-boot.actuator.v3+json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /actuator/health/liveness:
+    get:
+      tags:
+        - Operations
+      operationId: getLiveness
+      summary: Get application liveness
+      description: Indicates whether the application process is alive.
+      responses:
+        '200':
+          description: The application is live.
+          content:
+            application/vnd.spring-boot.actuator.v3+json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              examples:
+                up:
+                  value:
+                    status: UP
+        '503':
+          description: The application is not live.
+          content:
+            application/vnd.spring-boot.actuator.v3+json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /actuator/health/readiness:
+    get:
+      tags:
+        - Operations
+      operationId: getReadiness
+      summary: Get application readiness
+      description: Indicates whether the application is ready to receive traffic.
+      responses:
+        '200':
+          description: The application is ready.
+          content:
+            application/vnd.spring-boot.actuator.v3+json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              examples:
+                up:
+                  value:
+                    status: UP
+        '503':
+          description: The application is not ready.
+          content:
+            application/vnd.spring-boot.actuator.v3+json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+components:
+  parameters:
+    PublishFrom:
+      name: publishFrom
+      in: query
+      required: true
+      description: Earliest forecast publication to retrieve.
+      schema:
+        type: string
+        format: date-time
+      example: '2026-10-17T08:50:00Z'
+    DecisionTime:
+      name: decisionTime
+      in: query
+      required: true
+      description: Forecast cut-off. Publications after this instant are excluded.
+      schema:
+        type: string
+        format: date-time
+      example: '2026-10-19T08:50:00Z'
+    DeliveryFrom:
+      name: deliveryFrom
+      in: query
+      required: true
+      description: Inclusive start of the delivery window.
+      schema:
+        type: string
+        format: date-time
+      example: '2026-10-19T23:00:00Z'
+    DeliveryTo:
+      name: deliveryTo
+      in: query
+      required: true
+      description: Exclusive end of the delivery window.
+      schema:
+        type: string
+        format: date-time
+      example: '2026-10-20T23:00:00Z'
+  responses:
+    BadRequest:
+      description: Invalid required parameter or business window.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          examples:
+            invalidPublicationWindow:
+              value:
+                timestamp: '2026-10-26T03:15:00Z'
+                status: 400
+                error: Bad Request
+                message: publishFrom must not be after decisionTime
+                path: /api/energy/forecast/selected
+            invalidDeliveryWindow:
+              value:
+                timestamp: '2026-10-26T03:15:00Z'
+                status: 400
+                error: Bad Request
+                message: Delivery window must contain whole hours
+                path: /api/energy/accuracy
+    MethodNotAllowed:
+      description: The HTTP method is not supported by the endpoint.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          examples:
+            methodNotAllowed:
+              value:
+                timestamp: '2026-10-26T03:15:00Z'
+                status: 405
+                error: Method Not Allowed
+                message: HTTP method is not supported for this endpoint
+                path: /api/energy/forecast/selected
+    InternalServerError:
+      description: Unexpected server or upstream failure using Spring Boot's default error response.
+  schemas:
+    WindForecast:
+      type: object
+      additionalProperties: false
+      required:
+        - dataset
+        - publishTime
+        - startTime
+        - generation
+      properties:
+        dataset:
+          type: string
+          examples:
+            - WINDFOR
+        publishTime:
+          type: string
+          format: date-time
+        startTime:
+          type: string
+          format: date-time
+          description: Delivery-hour start time.
+        generation:
+          type: number
+          format: double
+          description: Forecast wind generation.
+    ForecastComparison:
+      type: object
+      additionalProperties: false
+      required:
+        - deliveryTime
+        - forecastGeneration
+        - actualGeneration
+        - error
+        - absoluteError
+      properties:
+        deliveryTime:
+          type: string
+          format: date-time
+          description: Delivery-hour start time.
+        forecastGeneration:
+          type: number
+          format: double
+        actualGeneration:
+          type: number
+          format: double
+        error:
+          type: number
+          format: double
+          description: Actual minus forecast. Negative values indicate overforecasting.
+        absoluteError:
+          type: number
+          format: double
+    ForecastAccuracyReport:
+      type: object
+      additionalProperties: false
+      required:
+        - matchedPeriods
+        - mae
+        - rmse
+        - meanBiasError
+        - comparisons
+        - expectedPeriods
+        - coveragePercent
+      properties:
+        matchedPeriods:
+          type: integer
+          minimum: 0
+          description: Hours with both a selected forecast and a complete actual.
+        mae:
+          type: number
+          format: double
+          minimum: 0
+        rmse:
+          type: number
+          format: double
+          minimum: 0
+        meanBiasError:
+          type: number
+          format: double
+        comparisons:
+          type: array
+          items:
+            $ref: '#/components/schemas/ForecastComparison'
+        expectedPeriods:
+          type: integer
+          minimum: 0
+          description: Number of whole hours in the delivery window.
+        coveragePercent:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 100
+    ApiError:
+      type: object
+      additionalProperties: false
+      required:
+        - timestamp
+        - status
+        - error
+        - message
+        - path
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+        error:
+          type: string
+        message:
+          type: string
+        path:
+          type: string
+    HealthResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - UP
+            - DOWN
+            - OUT_OF_SERVICE
+            - UNKNOWN
+        groups:
+          type: array
+          items:
+            type: string
+    ActuatorIndex:
+      type: object
+      properties:
+        _links:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              href:
+                type: string
+              templated:
+                type: boolean

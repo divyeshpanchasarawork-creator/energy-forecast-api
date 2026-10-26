@@ -14,12 +14,12 @@ import {
   summarizeDeliverySeries,
 } from "../utils/deliverySeries";
 import {
+  formatChartTime,
   formatDateTimeUtc,
   formatNumber,
   formatPercent,
   formatSignedNumber,
-  formatTime,
-  formatUkDate,
+  formatUkDateRange,
   NO_DATA,
 } from "../utils/formatters";
 
@@ -92,6 +92,10 @@ export default function ForecastActualChart({ report, forecasts, period }) {
     [forecasts, report, period],
   );
   const summary = useMemo(() => summarizeDeliverySeries(series), [series]);
+  const isRange = period.dayCount > 1;
+  const periodLabel = isRange
+    ? `${formatUkDateRange(period.startDate, period.endDate)} · ${period.dayCount} delivery days`
+    : `${formatUkDateRange(period.startDate, period.endDate)} UK delivery day`;
 
   return (
     <section className="rounded-xl border border-neutral-200 bg-white">
@@ -101,8 +105,7 @@ export default function ForecastActualChart({ report, forecasts, period }) {
             Forecast vs actual generation
           </h2>
           <p className="mt-0.5 text-xs text-neutral-500">
-            Hourly wind generation in MW · {formatUkDate(period.date)} UK
-            delivery day · hours in UTC
+            Hourly wind generation in MW · {periodLabel} · hours in UTC
           </p>
         </div>
         <ChartLegend />
@@ -112,15 +115,13 @@ export default function ForecastActualChart({ report, forecasts, period }) {
         {summary.forecastCount === 0 && summary.actualCount === 0 ? (
           <EmptyState
             title="No forecast or actual data"
-            message="The API returned no selected forecast or actual wind generation for the delivery hours in this snapshot. Choose another delivery date, preset, or refresh the data."
+            message="The API returned no selected forecast or actual wind generation for the delivery hours in this snapshot. Choose another date or range, preset, or refresh the data."
           />
         ) : (
           <>
             <div
               role="img"
-              aria-label={`Forecast versus actual wind generation for ${formatUkDate(
-                period.date,
-              )} UK delivery day. ${summary.forecastCount} forecast hours and ${summary.matchedCount} matched hours.`}
+              aria-label={`Forecast versus actual wind generation for ${periodLabel}. ${summary.forecastCount} forecast hours and ${summary.matchedCount} matched hours.`}
               className="h-[300px] w-full sm:h-[380px]"
             >
               <ResponsiveContainer width="100%" height="100%">
@@ -138,8 +139,10 @@ export default function ForecastActualChart({ report, forecasts, period }) {
                     dataKey="timestamp"
                     type="number"
                     domain={["dataMin", "dataMax"]}
-                    tickFormatter={formatTime}
-                    tickCount={6}
+                    tickFormatter={(value) =>
+                      formatChartTime(value, isRange)
+                    }
+                    tickCount={isRange ? 9 : 6}
                     minTickGap={28}
                     tickLine={false}
                     axisLine={{ stroke: "#e7e5e4" }}

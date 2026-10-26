@@ -7,6 +7,7 @@ import {
   formatDateTimeUtc,
   formatPercent,
   formatUkDate,
+  formatUkDateRange,
   formatUkDateTime,
 } from "../utils/formatters";
 import { toFiniteNumber } from "../utils/numbers";
@@ -38,6 +39,7 @@ export default function EvaluationSummary({ report, forecasts, period }) {
   const hasMatches = matched !== null && matched > 0;
   const hasForecasts = summary.forecastCount > 0;
   const isComplete = hasMatches && coverage !== null && coverage >= 99.95;
+  const isRange = period.dayCount > 1;
 
   let statusLabel = "Forecast pending";
   let statusClass = "bg-neutral-100 text-neutral-600";
@@ -47,7 +49,7 @@ export default function EvaluationSummary({ report, forecasts, period }) {
     statusClass = "bg-emerald-50 text-emerald-700";
   } else if (hasMatches) {
     statusLabel = "Partial coverage";
-  } else if (hasForecasts && period.isPreview) {
+  } else if (hasForecasts && period.snapshot === "preview") {
     statusLabel = "Live preview";
   } else if (hasForecasts) {
     statusLabel = "Awaiting actuals";
@@ -74,21 +76,46 @@ export default function EvaluationSummary({ report, forecasts, period }) {
 
       <dl className="grid grid-cols-1 gap-px bg-neutral-200 sm:grid-cols-2 xl:grid-cols-5">
         <SummaryItem
-          label="Delivery day"
-          value={`${formatUkDate(period.date)} (UK)`}
+          label={isRange ? "Delivery range" : "Delivery day"}
+          value={
+            <span>
+              <span>
+                {isRange
+                  ? formatUkDateRange(period.startDate, period.endDate)
+                  : formatUkDate(period.date)}{" "}
+                (UK)
+              </span>
+              {isRange ? (
+                <span className="mt-0.5 block text-[11px] font-normal text-neutral-500">
+                  {period.dayCount} days · {period.deliveryHours} delivery hours
+                </span>
+              ) : null}
+            </span>
+          }
         />
         <SummaryItem
           label="Gate closure"
           value={
-            <span>
+            isRange ? (
               <span>
-                {period.preset.shortLabel} ·{" "}
-                {formatUkDateTime(period.targetCutoff)}
+                <span>
+                  {period.preset.shortLabel} · {period.preset.timeLabel} UK
+                </span>
+                <span className="mt-0.5 block text-[11px] font-normal text-neutral-500">
+                  Independent cut-off for every delivery day
+                </span>
               </span>
-              <span className="mt-0.5 block text-[11px] font-normal text-neutral-500">
-                {formatDateTimeUtc(period.targetCutoff)}
+            ) : (
+              <span>
+                <span>
+                  {period.preset.shortLabel} ·{" "}
+                  {formatUkDateTime(period.targetCutoff)}
+                </span>
+                <span className="mt-0.5 block text-[11px] font-normal text-neutral-500">
+                  {formatDateTimeUtc(period.targetCutoff)}
+                </span>
               </span>
-            </span>
+            )
           }
         />
         <SummaryItem
@@ -110,10 +137,15 @@ export default function EvaluationSummary({ report, forecasts, period }) {
       </dl>
 
       <div className="border-t border-neutral-200 px-4 py-3 text-xs leading-5 text-neutral-500 sm:px-5">
-        {period.isPreview ? (
+        {period.snapshot === "preview" ? (
           <p className="mb-1.5">
             This is a live preview. The API is using the latest forecasts
             available when the page loaded, not the future gate closure.
+          </p>
+        ) : period.snapshot === "mixed" ? (
+          <p className="mb-1.5">
+            This range combines final gate snapshots for completed days with a
+            live preview for the pending delivery day.
           </p>
         ) : null}
         <p>

@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -47,15 +48,12 @@ public class EnergyController {
             @RequestParam Instant deliveryFrom,
             @RequestParam Instant deliveryTo) {
 
-        if (publishFrom.isAfter(decisionTime)) {
-            throw new IllegalArgumentException(
-                    "publishFrom must not be after decisionTime");
-        }
-
-        if (deliveryFrom.isAfter(deliveryTo)) {
-            throw new IllegalArgumentException(
-                    "deliveryFrom must not be after deliveryTo");
-        }
+        validatePeriod(
+                publishFrom,
+                decisionTime,
+                deliveryFrom,
+                deliveryTo
+        );
 
         List<WindForecast> forecasts =
                 forecastClient.fetchWindForecast(
@@ -80,7 +78,13 @@ public class EnergyController {
             @RequestParam Instant deliveryFrom,
             @RequestParam Instant deliveryTo) {
 
-        // Keep your existing validation and data-fetching code.
+        validatePeriod(
+                publishFrom,
+                decisionTime,
+                deliveryFrom,
+                deliveryTo
+        );
+        validateWholeHours(deliveryFrom, deliveryTo);
 
         var forecasts = forecastClient.fetchWindForecast(
                 publishFrom, decisionTime
@@ -124,4 +128,35 @@ public class EnergyController {
         );
     }
 
+    private void validatePeriod(
+            Instant publishFrom,
+            Instant decisionTime,
+            Instant deliveryFrom,
+            Instant deliveryTo) {
+
+        if (publishFrom.isAfter(decisionTime)) {
+            throw new IllegalArgumentException(
+                    "publishFrom must not be after decisionTime");
+        }
+
+        if (!deliveryFrom.isBefore(deliveryTo)) {
+            throw new IllegalArgumentException(
+                    "deliveryFrom must be before deliveryTo");
+        }
+    }
+
+    private void validateWholeHours(
+            Instant deliveryFrom,
+            Instant deliveryTo) {
+
+        long hours = ChronoUnit.HOURS.between(
+                deliveryFrom,
+                deliveryTo
+        );
+
+        if (!deliveryFrom.plus(hours, ChronoUnit.HOURS).equals(deliveryTo)) {
+            throw new IllegalArgumentException(
+                    "Delivery window must contain whole hours");
+        }
+    }
 }

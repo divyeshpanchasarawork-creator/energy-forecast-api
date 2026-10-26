@@ -1,6 +1,10 @@
 import { AlertTriangle, RefreshCw } from "lucide-react";
 
-export default function ErrorState({ error, onRetry }) {
+export default function ErrorState({
+  error,
+  onRetry,
+  title = "Could not load forecast data",
+}) {
   return (
     <div
       role="alert"
@@ -10,7 +14,7 @@ export default function ErrorState({ error, onRetry }) {
         <AlertTriangle size={18} strokeWidth={1.8} aria-hidden="true" />
       </div>
       <h2 className="mt-3 text-sm font-semibold text-neutral-800">
-        Could not load forecast data
+        {title}
       </h2>
       <p className="mt-1 max-w-md text-xs leading-5 text-neutral-500">
         {error?.message ||

@@ -17,6 +17,10 @@ const statusConfig = {
     label: "API error",
     dotClass: "bg-red-500",
   },
+  idle: {
+    label: "Select a valid range",
+    dotClass: "bg-amber-500",
+  },
 };
 
 export default function ApiStatus({ status, lastUpdated }) {

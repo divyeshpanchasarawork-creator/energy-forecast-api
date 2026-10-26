@@ -7,7 +7,7 @@ import {
 import {
   formatDateTimeUtc,
   formatPercent,
-  formatUkDate,
+  formatUkDateRange,
   formatUkDateTimeWithUtc,
 } from "../utils/formatters";
 import { toFiniteNumber } from "../utils/numbers";
@@ -33,6 +33,13 @@ export default function DataDetails({ period, report, forecasts = [] }) {
   );
   const matched = toFiniteNumber(report?.matchedPeriods);
   const hasMatches = matched !== null && matched > 0;
+  const isRange = period.dayCount > 1;
+  const snapshotLabel =
+    period.snapshot === "final"
+      ? "Final snapshot"
+      : period.snapshot === "preview"
+        ? "Live preview"
+        : "Mixed final + preview";
 
   return (
     <details className="group rounded-xl border border-neutral-200 bg-white">
@@ -48,10 +55,13 @@ export default function DataDetails({ period, report, forecasts = [] }) {
       <div className="border-t border-neutral-200 px-4 py-4 sm:px-5">
         <dl className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
           <DetailItem
-            label="Delivery day"
-            value={`${formatUkDate(period.date)} (UK) · ${
-              period.deliveryHours
-            } hours`}
+            label={isRange ? "Delivery range" : "Delivery day"}
+            value={`${formatUkDateRange(
+              period.startDate,
+              period.endDate,
+            )} (UK) · ${period.dayCount} ${
+              period.dayCount === 1 ? "day" : "days"
+            } · ${period.deliveryHours} hours`}
           />
           <DetailItem
             label="Delivery window (UTC)"
@@ -61,15 +71,23 @@ export default function DataDetails({ period, report, forecasts = [] }) {
           />
           <DetailItem
             label="Gate closure"
-            value={`${period.preset.shortLabel} · ${formatUkDateTimeWithUtc(
-              period.targetCutoff,
-            )}`}
+            value={
+              isRange
+                ? `${period.preset.shortLabel} · ${period.preset.timeLabel} UK each delivery day`
+                : `${period.preset.shortLabel} · ${formatUkDateTimeWithUtc(
+                    period.targetCutoff,
+                  )}`
+            }
           />
           <DetailItem
             label="Snapshot used"
-            value={`${
-              period.isPreview ? "Live preview" : "Final snapshot"
-            } · ${formatUkDateTimeWithUtc(period.decisionTime)}`}
+            value={
+              isRange
+                ? snapshotLabel
+                : `${snapshotLabel} · ${formatUkDateTimeWithUtc(
+                    period.decisionTime,
+                  )}`
+            }
           />
           <DetailItem
             label="Forecast publish from"
@@ -107,14 +125,15 @@ export default function DataDetails({ period, report, forecasts = [] }) {
 
         <div className="mt-5 space-y-1.5 border-t border-neutral-100 pt-4 text-xs leading-5 text-neutral-500">
           <p>
-            Forecasts are the latest WINDFOR records published on or before the
-            effective decision time shown above. Nothing published after that
-            snapshot is used.
+            Forecasts are the latest WINDFOR records published on or before each
+            delivery day's effective decision time. Nothing published after a
+            day's snapshot is used for that day.
           </p>
           <p>
             Before gate closure the effective snapshot is when the page loaded.
-            After gate closure it is the selected auction cutoff. Delivery-day
-            boundaries and cutoffs use Europe/London, including BST/GMT changes.
+            After gate closure it is the selected auction cutoff. Every delivery
+            day in a range has its own cutoff. Delivery-day boundaries and
+            cutoffs use Europe/London, including BST/GMT changes.
           </p>
           <p>
             Actual generation is FUELHH WIND data, averaged from two half-hour

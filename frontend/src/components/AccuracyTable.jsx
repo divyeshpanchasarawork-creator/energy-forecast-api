@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import EmptyState from "./EmptyState";
 import {
   buildDeliverySeries,
@@ -9,6 +9,7 @@ import {
   formatNumber,
   formatSignedNumber,
   formatUkDate,
+  formatUkDateRange,
 } from "../utils/formatters";
 
 const statusStyles = {
@@ -25,12 +26,43 @@ const statusLabels = {
   missing: "Missing",
 };
 
-export default function AccuracyTable({ report, forecasts, period }) {
+export default function AccuracyTable({
+  report,
+  forecasts,
+  period,
+  daily = [],
+}) {
+  const [selectedDate, setSelectedDate] = useState("all");
+  const isRange = period.dayCount > 1;
   const series = useMemo(
     () => buildDeliverySeries({ forecasts, report, period }),
     [forecasts, report, period],
   );
-  const summary = useMemo(() => summarizeDeliverySeries(series), [series]);
+  const selectedDay = isRange
+    ? daily.find((entry) => entry.date === selectedDate)
+    : null;
+  const visibleSeries = useMemo(() => {
+    if (!selectedDay) {
+      return series;
+    }
+
+    return series.filter(
+      (point) =>
+        point.timestamp >= selectedDay.period.deliveryStartMs &&
+        point.timestamp < selectedDay.period.deliveryEndMs,
+    );
+  }, [series, selectedDay]);
+  const summary = useMemo(
+    () => summarizeDeliverySeries(visibleSeries),
+    [visibleSeries],
+  );
+  const periodLabel = isRange
+    ? formatUkDateRange(period.startDate, period.endDate)
+    : formatUkDate(period.startDate);
+
+  useEffect(() => {
+    setSelectedDate("all");
+  }, [period.key]);
 
   return (
     <section className="rounded-xl border border-neutral-200 bg-white">
@@ -44,13 +76,38 @@ export default function AccuracyTable({ report, forecasts, period }) {
             UTC
           </p>
         </div>
-        <p className="text-xs text-neutral-500">
-          {summary.forecastCount} forecast hours · {summary.matchedCount}{" "}
-          matched
-        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          {isRange && daily.length > 0 ? (
+            <div>
+              <label
+                htmlFor="accuracy-day-filter"
+                className="sr-only"
+              >
+                Filter table by delivery day
+              </label>
+              <select
+                id="accuracy-day-filter"
+                value={selectedDate}
+                onChange={(event) => setSelectedDate(event.target.value)}
+                className="h-8 rounded-lg border border-neutral-300 bg-white px-2.5 text-xs text-neutral-700 shadow-sm outline-none transition-colors focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20"
+              >
+                <option value="all">All loaded days</option>
+                {daily.map((entry) => (
+                  <option key={entry.date} value={entry.date}>
+                    {formatUkDate(entry.date)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+          <p className="text-xs text-neutral-500">
+            {summary.forecastCount} forecast hours · {summary.matchedCount}{" "}
+            matched
+          </p>
+        </div>
       </div>
 
-      {summary.forecastCount === 0 && summary.actualCount === 0 ? (
+      {visibleSeries.length === 0 ? (
         <EmptyState
           title="No forecast or actual observations"
           message="No delivery hours could be matched to a selected forecast or actual generation. Try another delivery date, preset, or refresh the data."
@@ -66,8 +123,8 @@ export default function AccuracyTable({ report, forecasts, period }) {
             <div className="max-h-[480px] overflow-y-auto">
               <table className="w-full min-w-[900px] border-collapse text-left text-sm">
                 <caption className="sr-only">
-                  Forecast and matched delivery hours for{" "}
-                  {formatUkDate(period.date)} UK delivery day
+                  Forecast and matched delivery hours for {periodLabel}
+                  {isRange ? " delivery range" : " UK delivery day"}
                 </caption>
                 <thead className="sticky top-0 z-10 bg-white">
                   <tr className="border-b border-neutral-200 text-[10px] uppercase tracking-[0.08em] text-neutral-400">
@@ -107,7 +164,7 @@ export default function AccuracyTable({ report, forecasts, period }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {series.map((point) => {
+                  {visibleSeries.map((point) => {
                     const hasNegativeError =
                       point.error !== null && point.error < 0;
 

@@ -46,6 +46,15 @@ const timeFormatter = new Intl.DateTimeFormat("en-GB", {
   timeZone: UTC,
 });
 
+const chartRangeFormatter = new Intl.DateTimeFormat("en-GB", {
+  day: "2-digit",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+  timeZone: UTC,
+});
+
 const numberFormatter = new Intl.NumberFormat("en-GB", {
   maximumFractionDigits: 1,
 });
@@ -96,6 +105,34 @@ export function formatDate(value) {
 export function formatUkDate(value) {
   const date = toDate(value);
   return date ? ukDateFormatter.format(date) : "—";
+}
+
+export function formatUkDateRange(startDate, endDate) {
+  if (!startDate && !endDate) {
+    return "—";
+  }
+
+  if (!startDate || startDate === endDate) {
+    return formatUkDate(startDate ?? endDate);
+  }
+
+  if (!endDate) {
+    return formatUkDate(startDate);
+  }
+
+  return `${formatUkDate(startDate)} – ${formatUkDate(endDate)}`;
+}
+
+export function formatChartTime(value, includeDate = false) {
+  const date = toDate(value);
+
+  if (!date) {
+    return "";
+  }
+
+  return includeDate
+    ? chartRangeFormatter.format(date)
+    : timeFormatter.format(date);
 }
 
 export function formatDateTime(value) {

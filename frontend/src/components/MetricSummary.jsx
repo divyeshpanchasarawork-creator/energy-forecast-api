@@ -57,7 +57,7 @@ export default function MetricSummary({ report, forecasts = [] }) {
     <div className="space-y-3">
       {!hasMatches && hasForecasts ? (
         <p className="rounded-lg border border-neutral-200 bg-white px-4 py-3 text-xs leading-5 text-neutral-600">
-          Actual generation is not available for this delivery day yet. Forecast
+          Actual generation is not available for this selection yet. Forecast
           values are shown below; error metrics will populate after actuals are
           published.
         </p>

@@ -15,7 +15,7 @@ export default function InfoHint({ text }) {
       <span
         id={id}
         role="tooltip"
-        className="pointer-events-none absolute bottom-full left-0 z-30 mb-2 w-60 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-left text-[11px] font-normal leading-4 text-neutral-600 opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+        className="pointer-events-none absolute bottom-full right-0 z-30 mb-2 w-60 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-left text-[11px] font-normal leading-4 text-neutral-600 opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
       >
         {text}
       </span>
