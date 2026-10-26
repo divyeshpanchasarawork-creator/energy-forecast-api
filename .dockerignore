@@ -1,0 +1,13 @@
+.git
+.gitignore
+.gitattributes
+.idea
+.vscode
+.mvn
+target
+frontend
+HELP.md
+*.md
+.env
+.env.*
+.DS_Store
